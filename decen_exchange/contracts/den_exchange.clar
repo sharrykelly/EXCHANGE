@@ -103,3 +103,154 @@
   principal
   uint
 )
+
+;; private functions
+
+;; Safe math operations
+(define-private (min
+    (a uint)
+    (b uint)
+  )
+  (if (<= a b)
+    a
+    b
+  )
+)
+
+(define-private (max
+    (a uint)
+    (b uint)
+  )
+  (if (>= a b)
+    a
+    b
+  )
+)
+
+;; Reentrancy protection modifier
+(define-private (check-reentrancy)
+  (begin
+    (asserts! (not (var-get reentrancy-guard)) err-reentrancy)
+    (var-set reentrancy-guard true)
+    (ok true)
+  )
+)
+
+(define-private (clear-reentrancy)
+  (var-set reentrancy-guard false)
+)
+
+;; Helper function to get ordered token pair (simple deterministic ordering)
+(define-private (get-token-pair
+    (token-a principal)
+    (token-b principal)
+  )
+  (let (
+      (buff-a (unwrap-panic (to-consensus-buff? token-a)))
+      (buff-b (unwrap-panic (to-consensus-buff? token-b)))
+    )
+    (if (<= (len buff-a) (len buff-b))
+      {
+        token-a: token-a,
+        token-b: token-b,
+      }
+      {
+        token-a: token-b,
+        token-b: token-a,
+      }
+    )
+  )
+)
+
+;; Validate that a token contract implements SIP-010
+(define-private (validate-token-contract (token-contract <sip-010-trait>))
+  (let ((token-principal (contract-of token-contract)))
+    (and
+      (is-standard token-principal)
+      (not (is-eq token-principal (as-contract tx-sender)))
+    )
+  )
+)
+
+;; Validate numeric inputs are within reasonable bounds
+(define-private (validate-amount (amount uint))
+  (and (> amount u0) (< amount u340282366920938463463374607431768211455))
+)
+
+;; Validate slippage parameters
+(define-private (validate-slippage
+    (amount-desired uint)
+    (amount-min uint)
+  )
+  (and
+    (validate-amount amount-desired)
+    (validate-amount amount-min)
+    (<= amount-min amount-desired)
+  )
+)
+
+;; Update reward calculations for a pool
+(define-private (update-pool-rewards (pool-key {
+  token-a: principal,
+  token-b: principal,
+}))
+  (let (
+      (pool-data (unwrap! (map-get? pools pool-key) err-pool-not-found))
+      (last-reward-block (get last-reward-block pool-data))
+      (total-supply (get total-supply pool-data))
+      (blocks-elapsed (- stacks-block-height last-reward-block))
+    )
+    (if (and (> blocks-elapsed u0) (> total-supply u0))
+      (let (
+          (reward-per-block (var-get reward-rate))
+          (total-rewards (* blocks-elapsed reward-per-block))
+          (reward-per-share (/ (* total-rewards u1000000) total-supply))
+          (new-accumulated (+ (get accumulated-reward-per-share pool-data) reward-per-share))
+        )
+        (map-set pools pool-key
+          (merge pool-data {
+            last-reward-block: stacks-block-height,
+            accumulated-reward-per-share: new-accumulated,
+          })
+        )
+        (ok new-accumulated)
+      )
+      (ok (get accumulated-reward-per-share pool-data))
+    )
+  )
+)
+
+;; Calculate pending rewards for a liquidity provider
+(define-private (calculate-pending-rewards
+    (pool-key {
+      token-a: principal,
+      token-b: principal,
+    })
+    (provider principal)
+  )
+  (match (map-get? pools pool-key)
+    pool-data (let (
+        (provider-key {
+          pool: pool-key,
+          provider: provider,
+        })
+        (provider-data (map-get? liquidity-providers provider-key))
+      )
+      (match provider-data
+        lp-info (let (
+            (lp-amount (get amount lp-info))
+            (reward-debt (get reward-debt lp-info))
+            (accumulated-reward-per-share (get accumulated-reward-per-share pool-data))
+            (pending (* lp-amount accumulated-reward-per-share))
+          )
+          (if (> pending reward-debt)
+            (/ (- pending reward-debt) u1000000)
+            u0
+          )
+        )
+        u0
+      )
+    )
+    u0
+  )
+)
