@@ -1,13 +1,31 @@
+/**
+ * Decentralized Exchange Test Suite
+ *
+ * Comprehensive tests for the DEX contract covering:
+ * - Pool creation and management
+ * - Liquidity provision and removal
+ * - Token swapping with AMM pricing
+ * - Reward distribution and claiming
+ * - Query functions and data retrieval
+ * - Security validations and edge cases
+ *
+ * Total: 58 tests validating all contract functionality
+ */
+
 import { describe, expect, it, beforeEach } from "vitest";
 import { Cl } from "@stacks/transactions";
 
+// Get simnet accounts for testing different user interactions
 const accounts = simnet.getAccounts();
 const deployer = accounts.get("deployer")!;
 const wallet1 = accounts.get("wallet_1")!;
 const wallet2 = accounts.get("wallet_2")!;
 const wallet3 = accounts.get("wallet_3")!;
 
-// Helper function to mint tokens for testing
+/**
+ * Helper function to mint test tokens for a wallet
+ * Mints 1 trillion tokens of each type (test-token-a, b, c) by default
+ */
 function mintTokensForWallet(wallet: string, amount: number = 1000000000000) {
   simnet.callPublicFn("test-token-a", "mint", [Cl.uint(amount), Cl.principal(wallet)], deployer);
   simnet.callPublicFn("test-token-b", "mint", [Cl.uint(amount), Cl.principal(wallet)], deployer);
@@ -15,7 +33,7 @@ function mintTokensForWallet(wallet: string, amount: number = 1000000000000) {
 }
 
 describe("Decentralized Exchange Tests", () => {
-  // Mint tokens for all wallets before tests
+  // Setup: Mint tokens for all test wallets before each test
   beforeEach(() => {
     mintTokensForWallet(wallet1);
     mintTokensForWallet(wallet2);
@@ -23,6 +41,10 @@ describe("Decentralized Exchange Tests", () => {
     mintTokensForWallet(deployer);
   });
 
+  // ============================================
+  // INITIALIZATION TESTS
+  // Validates basic contract setup and default values
+  // ============================================
   describe("Initialization", () => {
     it("ensures simnet is well initialised", () => {
       expect(simnet.blockHeight).toBeDefined();
@@ -55,6 +77,10 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // POOL CREATION TESTS
+  // Tests pool initialization, validation, and management
+  // ============================================
   describe("Pool Creation", () => {
     it("successfully creates a new pool", () => {
       const { result } = simnet.callPublicFn(
@@ -177,9 +203,13 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // ADD LIQUIDITY TESTS
+  // Tests liquidity provision, LP token minting, and validations
+  // ============================================
   describe("Add Liquidity", () => {
     beforeEach(() => {
-      // Create a pool before each test
+      // Create a pool before each liquidity test
       simnet.callPublicFn(
         "den_exchange",
         "create-pool",
@@ -377,9 +407,13 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // REMOVE LIQUIDITY TESTS
+  // Tests liquidity withdrawal, LP token burning, and proportional returns
+  // ============================================
   describe("Remove Liquidity", () => {
     beforeEach(() => {
-      // Create pool and add initial liquidity
+      // Create pool and add initial liquidity for removal tests
       simnet.callPublicFn(
         "den_exchange",
         "create-pool",
@@ -553,9 +587,13 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // TOKEN SWAP TESTS
+  // Tests AMM swaps, fee calculations, and slippage protection
+  // ============================================
   describe("Token Swaps", () => {
     beforeEach(() => {
-      // Create pool with 10:20 ratio (1:2)
+      // Create pool with 10:20 ratio (1:2) for swap tests
       simnet.callPublicFn(
         "den_exchange",
         "create-pool",
@@ -769,9 +807,13 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // REWARDS SYSTEM TESTS
+  // Tests staking rewards, claiming, and distribution
+  // ============================================
   describe("Rewards System", () => {
     beforeEach(() => {
-      // Create pool and add liquidity
+      // Create pool and add liquidity for reward tests
       simnet.callPublicFn(
         "den_exchange",
         "create-pool",
@@ -996,9 +1038,13 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // READ-ONLY QUERY FUNCTION TESTS
+  // Tests data retrieval, calculations, and query validations
+  // ============================================
   describe("Read-Only Query Functions", () => {
     beforeEach(() => {
-      // Setup pool with liquidity
+      // Setup pool with liquidity for query tests
       simnet.callPublicFn(
         "den_exchange",
         "create-pool",
@@ -1169,6 +1215,10 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // EDGE CASES AND SECURITY TESTS
+  // Tests boundary conditions, overflow protection, and attack prevention
+  // ============================================
   describe("Edge Cases and Security", () => {
     it("prevents reentrancy attacks", () => {
       // Create pool
@@ -1318,6 +1368,10 @@ describe("Decentralized Exchange Tests", () => {
     });
   });
 
+  // ============================================
+  // COMPLEX SCENARIO TESTS
+  // Tests multi-user interactions and real-world usage patterns
+  // ============================================
   describe("Complex Scenarios", () => {
     it("handles multiple users interacting with same pool", () => {
       // Create pool
